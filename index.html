@@ -1,0 +1,36 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>PPTX 文字提取</title>
+<style>
+  body{font-family:Arial,Helvetica,sans-serif;margin:40px;background:#f7f7f7}
+  h2{margin-top:0}
+  section{background:#fff;padding:20px 30px;margin:20px 0;border-radius:6px;box-shadow:0 2px 4px rgba(0,0,0,.1)}
+  section h3{margin:0 0 10px;font-size:18px;color:#00529b}
+  section p{line-height:1.6;margin:4px 0}
+</style>
+</head>
+<body>
+<h2>PPTX 文字提取</h2>
+<input type="file" id="f" accept=".pptx"/>
+<div id="out"></div>
+
+<script>
+document.getElementById('f').addEventListener('change', async e=>{
+  const fd = new FormData();
+  fd.append('ppt', e.target.files[0]);
+  const r = await fetch('http://localhost:3000/ppt', {method:'POST', body: fd});
+  const data = await r.json();
+
+  const box = document.getElementById('out');
+  box.innerHTML = '';                       // 清空旧内容
+  data.forEach(slide=>{
+    const sec = document.createElement('section');
+    sec.innerHTML = slide.texts.map(t=>`<p>${t}</p>`).join('');
+    box.appendChild(sec);
+  });
+});
+</script>
+</body>
+</html>
