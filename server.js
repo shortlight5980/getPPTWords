@@ -109,7 +109,6 @@ app.post('/ppt', upload.single('ppt'), async (req, res) => {
         const target = relMap[rId];
         if (!target) continue;
         if (target.includes('diagrams/')) {
-          console.log(`Extracting SmartArt texts from ppt/${target}...`);
           texts.push(...await extractTexts(zip, `ppt/${target}`));
         } else if (target.includes('/charts/')) {
           texts.push(...await extractTexts(zip, `ppt/${target}`));
