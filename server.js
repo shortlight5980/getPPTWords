@@ -5,10 +5,24 @@ const cors    = require('cors');
 const JSZip   = require('jszip');
 const fs      = require('fs');
 const path    = require('path');
+const { log } = require('console');
 
 const app = express();
 app.use(cors());
 const upload = multer({ dest: 'uploads/' });
+
+// 新增：拿到本页所有“外部引用”的 rId
+function collectExternalIds(slideXml) {
+  const ids = new Set();
+  const relIdsRe = /<dgm:relIds[^>]*\sr:dm="([^"]+)"/g;
+  // 3. Chart
+  const chartRe = /chart[^>]*r:id="([^"]+)"/g;
+
+  let m;
+  while ((m = relIdsRe.exec(slideXml)) !== null) ids.add(m[1]);
+  while ((m = chartRe.exec(slideXml)) !== null) ids.add(m[1]);
+  return [...ids];
+}
 
 // 通用函数：从任意 xml 里把 <a:t>xxx</a:t> 扫出来
 // 1. 把文件内容读成字符串（异步）
@@ -49,10 +63,10 @@ async function buildRelMap(zip, slideIdx) {
   const xml = await file.async('text');
   const map = {};
   // 例：<Relationship Id="rId3" Type=".../chart" Target="../charts/chart2.xml"/>
-  const re = /Id="([^"]+)"[^T]*Target="([^"]+)"/g;
+  const re = /Id="([^"]+)"\s+Type="[^"]+"\s+Target="([^"]+)"/g;
   let m;
   while ((m = re.exec(xml)) !== null) {
-    map[m[1]] = m[2];          // rId -> charts/chartN.xml
+    map[m[1]] = m[2].slice(3);          // rId -> charts/chartN.xml
   }
   return map;
 }
@@ -82,13 +96,27 @@ app.post('/ppt', upload.single('ppt'), async (req, res) => {
     const result = [];
     for (const slidePath of slideList) {
       const idx = +slidePath.match(/slide(\d+)\.xml/)[1];
-      const normalTexts = await extractTexts(zip, slidePath);
-      const smartTexts  = await extractTexts(zip, `ppt/diagrams/data${idx}.xml`);
-      const chartTexts  = await extractChartTexts(zip, idx);   // 新增
-      result.push({
-        slide: idx,
-        texts: [...normalTexts, ...smartTexts, ...chartTexts] // 合并三类
-      });
+      const slideXml = await zip.file(slidePath).async('text');
+
+      // 1. 普通文本
+      const texts = await extractTexts(zip, slidePath);
+
+      // 2. 本页引用的外部对象
+      const relMap = await buildRelMap(zip, idx);
+      const externalIds = collectExternalIds(slideXml);
+
+      for (const rId of externalIds) {
+        const target = relMap[rId];
+        if (!target) continue;
+        if (target.includes('diagrams/')) {
+          console.log(`Extracting SmartArt texts from ppt/${target}...`);
+          texts.push(...await extractTexts(zip, `ppt/${target}`));
+        } else if (target.includes('/charts/')) {
+          texts.push(...await extractTexts(zip, `ppt/${target}`));
+        }
+      }
+
+      result.push({ slide: idx, texts });
     }
     res.json(result);
   } catch (e) {
