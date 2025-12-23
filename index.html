@@ -1,166 +1,199 @@
 <!doctype html>
 <html lang="zh-CN">
+
 <head>
-<meta charset="utf-8">
-<title>PPTX 文字提取</title>
-<style>
-  :root{
-    --bg:#f3f6fa;
-    --card:#ffffff;
-    --accent:#4285f4;
-    --text:#202124;
-    --radius:12px;
-    --shadow:0 4px 18px rgba(0,0,0,.06);
-  }
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif;
-    background:var(--bg);
-    color:var(--text);
-    display:flex;
-    flex-direction:column;
-    align-items:center;
-    padding:60px 20px;
-    min-height:100vh;
-  }
-  h1{margin-bottom:24px;font-size:28px;font-weight:500;letter-spacing:.5px}
-  #inp{display:none}               /* 隐藏原生 input */
-  label[for=inp]{
-    background:var(--accent);
-    color:#fff;
-    padding:12px 32px;
-    border-radius:var(--radius);
-    cursor:pointer;
-    font-size:16px;
-    box-shadow:var(--shadow);
-    transition:transform .2s;
-  }
-  label[for=inp]:hover{transform:translateY(-2px)}
-  #drop{
-    width:100%;
-    max-width:550px;
-    margin:24px 0 40px;
-    padding:60px 20px;
-    border:2px dashed var(--accent);
-    border-radius:var(--radius);
-    text-align:center;
-    color:var(--accent);
-    background:rgba(66,133,244,.04);
-    transition:background .25s;
-  }
-  #drop.dragover{background:rgba(66,133,244,.12)}
-  #out{
-    width:100%;
-    max-width:680px;
-    display:grid;
-    gap:24px;
-  }
-  .card{
-    background:var(--card);
-    padding:28px 32px;
-    border-radius:var(--radius);
-    box-shadow:var(--shadow);
-    line-height:1.7;
-    font-size:17px;
-  }
-  .card p{margin:8px 0}
-</style>
-</head>
-<body>
-<h1>PPTX 文字提取</h1>
-<input type="file" id="inp" accept=".pptx"/>
-<label for="inp">选择文件</label>
-<div id="drop">或拖入文件到此处</div>
-<div id="out"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-<script>
-/* ====== 以下全部是原“纯前端”提取逻辑，仅最后一小段渲染方式被替换 ====== */
-function extractTexts(xml){
-  const out=[];
-  const pRe=/<a:p(?:\s[^>]*)?>(.*?)<\/a:p>/gs;
-  const tRe=/<a:t[^>]*>([^<]*)<\/a:t>/g;
-  let pm;
-  while((pm=pRe.exec(xml))!==null){
-    const seg=pm[1],line=[];
-    let tm; tRe.lastIndex=0;
-    while((tm=tRe.exec(seg))!==null) line.push(tm[1]);
-    if(line.length) out.push(line.join(''));
-  }
-  if(!out.length){
-    tRe.lastIndex=0; let tm;
-    while((tm=tRe.exec(xml))!==null) out.push(tm[1]);
-  }
-  return out;
-}
-function buildRelMap(relXml){
-  const map={};
-  const re=/Id="([^"]+)"\s+Type="[^"]+"\s+Target="([^"]+)"/g; let m;
-  while((m=re.exec(relXml))!==null) map[m[1]]=m[2].slice(3);
-  return map;
-}
-
-/* ====================== 渲染：卡片式 ====================== */
-function render(slidesData){
-  const box=document.getElementById('out');
-  box.innerHTML='';
-  slidesData.forEach(s=>{
-    const div=document.createElement('div');
-    div.className='card';
-    div.innerHTML=s.texts.map(t=>`<p>${t}</p>`).join('');
-    box.appendChild(div);
-  });
-}
-/* ========================================================= */
-
-inp.onchange=async e=>{
-  const file=e.target.files[0]; if(!file)return;
-  const zip=await JSZip.loadAsync(file);
-  const slides=Object.keys(zip.files)
-        .filter(f=>/^ppt\/slides\/slide(\d+)\.xml$/.test(f))
-        .sort((a,b)=> a.match(/(\d+)/)[1]-b.match(/(\d+)/)[1] );
-
-  const res=[];
-  for(const slidePath of slides){
-    const idx=+slidePath.match(/slide(\d+)\.xml/)[1];
-    const slideXml=await zip.file(slidePath).async('string');
-    const texts=extractTexts(slideXml);
-
-    const relPath=`ppt/slides/_rels/slide${idx}.xml.rels`;
-    const relFile=zip.file(relPath);
-    if(relFile){
-      const relMap=buildRelMap(await relFile.async('string'));
-      const idRe=/(?:(<dgm:relIds[^>]*\sr:dm="([^"]+)")|(chart[^>]*r:id="([^"]+)"))/g; let m;
-      const seen=new Set();
-      while((m=idRe.exec(slideXml))!==null) seen.add(m[2]||m[4]);
-      for(const rId of seen){
-        const tgt=relMap[rId]; if(!tgt) continue;
-        if(tgt.includes('diagrams/')||tgt.includes('/charts/')){
-          const xml=await zip.file('ppt/'+tgt).async('string');
-          texts.push(...extractTexts(xml));
-        }
-      }
+  <meta charset="utf-8">
+  <title>PPTX 文字提取</title>
+  <style>
+    :root {
+      --bg: #f3f6fa;
+      --card: #ffffff;
+      --accent: #4285f4;
+      --text: #202124;
+      --radius: 12px;
+      --shadow: 0 4px 18px rgba(0, 0, 0, .06);
     }
-    res.push({slide:idx,texts});
-  }
-  render(res);          // ←←← 只改这里：不再 JSON 输出，而是卡片渲染
-};
 
-/* ====================== 拖拽上传 ====================== */
-const drop=document.getElementById('drop');
-['dragenter','dragover','dragleave','drop'].forEach(evt=>{
-  drop.addEventListener(evt,e=>{e.preventDefault();e.stopPropagation();},false);
-});
-['dragenter','dragover'].forEach(evt=>{
-  drop.addEventListener(evt,()=>drop.classList.add('dragover'),false);
-});
-['dragleave','drop'].forEach(evt=>{
-  drop.addEventListener(evt,()=>drop.classList.remove('dragover'),false);
-});
-drop.addEventListener('drop',e=>{
-  const f=e.dataTransfer.files[0];
-  if(f && f.name.endsWith('.pptx')) inp.files=e.dataTransfer.files, inp.onchange({target:inp});
-},false);
-</script>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 20px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin-bottom: 24px;
+      font-size: 28px;
+      font-weight: 500;
+      letter-spacing: .5px
+    }
+
+    #inp {
+      display: none
+    }
+
+    /* 隐藏原生 input */
+    label[for=inp] {
+      background: var(--accent);
+      color: #fff;
+      padding: 12px 32px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 16px;
+      box-shadow: var(--shadow);
+      transition: transform .2s;
+    }
+
+    label[for=inp]:hover {
+      transform: translateY(-2px)
+    }
+
+    #drop {
+      width: 100%;
+      max-width: 550px;
+      margin: 24px 0 40px;
+      padding: 60px 20px;
+      border: 2px dashed var(--accent);
+      border-radius: var(--radius);
+      text-align: center;
+      color: var(--accent);
+      background: rgba(66, 133, 244, .04);
+      transition: background .25s;
+    }
+
+    #drop.dragover {
+      background: rgba(66, 133, 244, .12)
+    }
+
+    #out {
+      width: 100%;
+      max-width: 680px;
+      display: grid;
+      gap: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      padding: 28px 32px;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      line-height: 1.7;
+      font-size: 17px;
+    }
+
+    .card p {
+      margin: 8px 0
+    }
+  </style>
+</head>
+
+<body>
+  <h1>PPTX 文字提取</h1>
+  <input type="file" id="inp" accept=".pptx" />
+  <label for="inp">选择文件</label>
+  <div id="drop">或拖入文件到此处</div>
+  <div id="out"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script>
+
+    function extractTexts(xml) {
+      const out = [];
+      const pRe = /<a:p(?:\s[^>]*)?>(.*?)<\/a:p>/gs;
+      const tRe = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+      let pm;
+      while ((pm = pRe.exec(xml)) !== null) {
+        const seg = pm[1], line = [];
+        let tm; tRe.lastIndex = 0;
+        while ((tm = tRe.exec(seg)) !== null) line.push(tm[1]);
+        if (line.length) out.push(line.join(''));
+      }
+      if (!out.length) {
+        tRe.lastIndex = 0; let tm;
+        while ((tm = tRe.exec(xml)) !== null) out.push(tm[1]);
+      }
+      return out;
+    }
+
+    function buildRelMap(relXml) {
+      const map = {};
+      const re = /Id="([^"]+)"\s+Type="[^"]+"\s+Target="([^"]+)"/g; let m;
+      while ((m = re.exec(relXml)) !== null) map[m[1]] = m[2].slice(3);
+      return map;
+    }
+
+    /* ====================== 渲染：卡片式 ====================== */
+    function render(slidesData) {
+      const box = document.getElementById('out');
+      box.innerHTML = '';
+      slidesData.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = s.texts.map(t => `<p>${t}</p>`).join('');
+        box.appendChild(div);
+      });
+    }
+    /* ========================================================= */
+
+    inp.onchange = async e => {
+      const file = e.target.files[0]; if (!file) return;
+      const zip = await JSZip.loadAsync(file);
+      const slides = Object.keys(zip.files)
+        .filter(f => /^ppt\/slides\/slide(\d+)\.xml$/.test(f))
+        .sort((a, b) => a.match(/(\d+)/)[1] - b.match(/(\d+)/)[1]);
+
+      const res = [];
+      for (const slidePath of slides) {
+        const idx = +slidePath.match(/slide(\d+)\.xml/)[1];
+        const slideXml = await zip.file(slidePath).async('string');
+        const texts = extractTexts(slideXml);
+
+        const relPath = `ppt/slides/_rels/slide${idx}.xml.rels`;
+        const relFile = zip.file(relPath);
+        if (relFile) {
+          const relMap = buildRelMap(await relFile.async('string'));
+          const idRe = /(?:(<dgm:relIds[^>]*\sr:dm="([^"]+)")|(chart[^>]*r:id="([^"]+)"))/g; let m;
+          const seen = new Set();
+          while ((m = idRe.exec(slideXml)) !== null) seen.add(m[2] || m[4]);
+          for (const rId of seen) {
+            const tgt = relMap[rId]; if (!tgt) continue;
+            if (tgt.includes('diagrams/') || tgt.includes('/charts/')) {
+              const xml = await zip.file('ppt/' + tgt).async('string');
+              texts.push(...extractTexts(xml));
+            }
+          }
+        }
+        res.push({ slide: idx, texts });
+      }
+      render(res);
+    };
+
+    /* ====================== 拖拽上传 ====================== */
+    const drop = document.getElementById('drop');
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(evt => {
+      drop.addEventListener(evt, e => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    ['dragenter', 'dragover'].forEach(evt => {
+      drop.addEventListener(evt, () => drop.classList.add('dragover'), false);
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+      drop.addEventListener(evt, () => drop.classList.remove('dragover'), false);
+    });
+    drop.addEventListener('drop', e => {
+      const f = e.dataTransfer.files[0];
+      if (f && f.name.endsWith('.pptx')) inp.files = e.dataTransfer.files, inp.onchange({ target: inp });
+    }, false);
+  </script>
 </body>
+
 </html>
