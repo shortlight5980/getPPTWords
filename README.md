@@ -1,5 +1,5 @@
 ## getPPTWords
-#### 一个纯前端的PPT文字提取器
+一个纯前端的PPT文字提取器
 
 ## 在线体验地址
 https://shortlight5980.github.io/getPPTWords/
