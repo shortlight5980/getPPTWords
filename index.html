@@ -71,10 +71,6 @@
       transition: background .25s;
     }
 
-    pre {
-      max-width: 550px;
-    }
-
     #drop.dragover {
       background: rgba(66, 133, 244, .12)
     }
@@ -200,7 +196,7 @@
       slidesData.forEach(s => {
         const div = document.createElement('div');
         div.className = 'card';
-        div.innerHTML = s.texts.map(t => `<pre>${t}</pre>`).join('');
+        div.innerHTML = s.texts.map(t => `<p>${t}</p>`).join('');
         box.appendChild(div);
       });
     }
