@@ -125,6 +125,63 @@
       return out;
     }
 
+    // function extractTexts(xml) {
+    //   const out = [];
+
+    //   // 1. 先切出行
+    //   const trRe = /<a:tr(?:\s[^>]*)?>(.*?)<\/a:tr>/gs;
+    //   const tcRe = /<a:tc(?:\s[^>]*)?>(.*?)<\/a:tc>/gs;
+    //   const tRe = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+
+    //   let trM;
+    //   while ((trM = trRe.exec(xml)) !== null) {
+    //     const rowXml = trM[1];
+    //     const rowCells = [];
+
+    //     // 2. 再切出单元格
+    //     let tcM;
+    //     tcRe.lastIndex = 0;
+    //     while ((tcM = tcRe.exec(rowXml)) !== null) {
+    //       const tcXml = tcM[1];
+
+    //       // 3. 把单元格里所有 <a:t> 拼起来
+    //       const cellTexts = [];
+    //       let tM;
+    //       tRe.lastIndex = 0;
+    //       while ((tM = tRe.exec(tcXml)) !== null) {
+    //         cellTexts.push(tM[1]);
+    //       }
+    //       rowCells.push(cellTexts.join(''));
+    //     }
+
+    //     // 4. 整行用 \t 拼接，再用双引号包起来
+    //     if (rowCells.length) {
+    //       out.push(rowCells.join('\t'));
+    //     }
+    //   }
+
+    //   // 没找到 <a:tr> 时，全局扫 <a:t>
+    //   if (!out.length) {
+    //     const pRe = /<a:p(?:\s[^>]*)?>(.*?)<\/a:p>/gs;
+    //     const tRe = /<a:t[^>]*>([^<]*)<\/a:t>/g;
+    //     let pm;
+    //     while ((pm = pRe.exec(xml)) !== null) {
+    //       console.log(pm);
+    //       const seg = pm[1], line = [];
+    //       let tm; tRe.lastIndex = 0;
+    //       while ((tm = tRe.exec(seg)) !== null) line.push(tm[1]);
+    //       console.log(line);
+    //       if (line.length) out.push(line.join(''));
+    //     }
+    //     if (!out.length) {
+    //       tRe.lastIndex = 0; let tm;
+    //       while ((tm = tRe.exec(xml)) !== null) out.push(tm[1]);
+    //     }
+    //   }
+
+    //   return out;
+    // }
+
     function buildRelMap(relXml) {
       const map = {};
       const re = /Id="([^"]+)"\s+Type="[^"]+"\s+Target="([^"]+)"/g; let m;
@@ -139,7 +196,7 @@
       slidesData.forEach(s => {
         const div = document.createElement('div');
         div.className = 'card';
-        div.innerHTML = s.texts.map(t => `<p>${t}</p>`).join('');
+        div.innerHTML = s.texts.map(t => `<pre>${t}</pre>`).join('');
         box.appendChild(div);
       });
     }
